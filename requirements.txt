@@ -1,0 +1,4 @@
+langchain
+cohere
+gradio
+python-dotenv
