@@ -18,23 +18,47 @@ COHERE_API_KEY = os.environ["COHERE_API_KEY"]
 # co = cohere.Client(api_key=COHERE_API_KEY)
 
 
-def chat(question, model):
-    template = """{question}"""
-
-    prompt = PromptTemplate(template=template, input_variables=["question"])
-    llm = Cohere(cohere_api_key=COHERE_API_KEY, model=model)
-    llm_chain = LLMChain(prompt=prompt, llm=llm)
-
-    return llm_chain.run(question)
+async def clear_one_item():
+    yield gr.update(value="")
 
 
-async def chat_stream(question, model):
+async def clear_two_items():
+    yield gr.update(value=""), gr.update(value="")
+
+
+async def clear_three_items():
+    yield gr.update(value=""), gr.update(value=""), gr.update(value="")
+
+
+async def clear_four_items():
+    yield gr.update(value=""), gr.update(value=""), gr.update(value="")
+
+
+async def clear_five_items():
+    yield gr.update(value=""), gr.update(value=""), gr.update(value="")
+
+
+# def chat(question, model):
+#     template = """{question}"""
+#
+#     prompt = PromptTemplate(template=template, input_variables=["question"])
+#     llm = Cohere(cohere_api_key=COHERE_API_KEY, model=model)
+#     llm_chain = LLMChain(prompt=prompt, llm=llm)
+#
+#     return llm_chain.run(question)
+
+
+async def chat_stream(question, model, citation_quality, prompt_truncation, randomness):
+    if question is None or question == "" or len(question) == 0:
+        return
     async with cohere.AsyncClient(api_key=COHERE_API_KEY) as aio_co:
         streaming_chat = await aio_co.chat(
             message=question,
-            max_tokens=4000,
             model=model,
             stream=True,
+            citation_quality=citation_quality,
+            prompt_truncation=prompt_truncation,
+            temperature=randomness
         )
         completion = ""
         async for token in streaming_chat:
@@ -45,13 +69,26 @@ async def chat_stream(question, model):
                 yield gr.update(value=completion)
 
 
-async def generate_stream(question, model):
+async def clear_chat_stream():
+    yield (gr.update(value=""), gr.update(value=""), gr.update(value="accurate"),
+           gr.update(value="auto"), gr.update(value=0.3))
+
+
+async def generate_stream(question, model, number_of_words, randomness,
+                          stop_sentence, top_k, show_likelihood):
+    if question is None or question == "" or len(question) == 0:
+        return
+    print(f"show_likelihood: {show_likelihood}")
     async with cohere.AsyncClient(api_key=COHERE_API_KEY) as aio_co:
         streaming_generate = await aio_co.generate(
             prompt=question,
-            max_tokens=4000,
+            max_tokens=3 * number_of_words,
             model=model,
             stream=True,
+            temperature=randomness,
+            stop_sequences=[] if stop_sentence is None else stop_sentence.split(","),
+            k=top_k,
+            return_likelihoods="GENERATION" if show_likelihood else "NONE"
         )
         completion = ""
         async for token in streaming_generate:
@@ -62,7 +99,14 @@ async def generate_stream(question, model):
                 yield gr.update(value=completion)
 
 
+async def clear_generate_stream():
+    yield (gr.update(value=""), gr.update(value=""), gr.update(value=100), gr.update(value=0.9),
+           gr.update(value=""), gr.update(value=0), gr.update(value=False))
+
+
 async def summarize_stream(question, model):
+    if question is None or question == "" or len(question) == 0:
+        return
     async with cohere.AsyncClient(api_key=COHERE_API_KEY) as aio_co:
         summarize = await aio_co.summarize(
             text=question,
@@ -77,6 +121,8 @@ async def summarize_stream(question, model):
 
 
 async def classify_stream(examples, question, model):
+    if question is None or question == "" or len(question) == 0:
+        return
     examples = json.loads(examples)
     examples = [Example(example["text"], example["label"]) for example in examples]
     async with cohere.AsyncClient(api_key=COHERE_API_KEY) as aio_co:
@@ -93,6 +139,8 @@ async def classify_stream(examples, question, model):
 
 
 async def embed_stream(question, model):
+    if question is None or question == "" or len(question) == 0:
+        return
     async with cohere.AsyncClient(api_key=COHERE_API_KEY) as aio_co:
         texts = [question]
         print(f"texts: {texts}")
@@ -114,39 +162,118 @@ with gr.Blocks() as demo:
         with gr.TabItem(label="Chat"):
             with gr.Row():
                 with gr.Column():
-                    answer_text = gr.Textbox(label="answer", lines=20)
-                    question_text = gr.Textbox(label="question", lines=2)
-                    chat_button = gr.Button(value="send", label="send", variant="primary")
-                    model_text = gr.Dropdown(label="model",
+                    answer_text = gr.Textbox(label="Answer", lines=10, max_lines=10, show_copy_button=True)
+                    question_text = gr.Textbox(label="Question", lines=2)
+            with gr.Row():
+                with gr.Column():
+                    clear_button = gr.Button(value="Clear", label="Clear")
+                with gr.Column():
+                    chat_button = gr.Button(value="Send", label="Send", variant="primary")
+            with gr.Row():
+                with gr.Column():
+                    model_text = gr.Dropdown(label="Model",
                                              choices=["command", "command-nightly",
-                                                      "command-light", "command-light-nightly",
-                                                      "base", "base-light",
-                                                      "embed-multilingual-v2.0", "embed-english-v2.0",
-                                                      "embed-english-light-v2.0",
-                                                      "rerank-multilingual-v2.0", "rerank-english-v2.0"],
-                                             value="command-nightly"
+                                                      "command-light", "command-light-nightly"],
+                                             value="command",
                                              )
+            with gr.Row():
+                with gr.Column():
+                    with gr.Accordion("Advanced Parameters", open=False):
+                        with gr.Row():
+                            with gr.Column():
+                                citation_quality_text = gr.Dropdown(label="CITATION QUALITY",
+                                                                    choices=["accurate", "fast"],
+                                                                    value="accurate",
+                                                                    interactive=True
+                                                                    )
+                            with gr.Column():
+                                prompt_truncation_text = gr.Dropdown(label="PROMPT TRUNCATION",
+                                                                     choices=["auto", "off"],
+                                                                     value="auto",
+                                                                     interactive=True
+                                                                     )
+                            with gr.Column():
+                                randomness_text = gr.Slider(label="RANDOMNESS(Temperature)",
+                                                            minimum=0,
+                                                            maximum=2,
+                                                            step=0.1,
+                                                            value=0.3,
+                                                            interactive=True
+                                                            )
+            with gr.Row():
+                with gr.Column():
                     gr.Examples(examples=["Can you give me a global market overview of the solar panels?",
                                           "Gather business intelligence on the Chinese markets",
                                           "Summarize recent news about the North American tech job market",
                                           "Give me a rundown of AI startups in the productivity space"],
                                 inputs=question_text)
-                    chat_button.click(chat_stream,
-                                      inputs=[question_text, model_text],
-                                      outputs=answer_text)
+            clear_button.click(clear_chat_stream,
+                               inputs=[],
+                               outputs=[question_text, answer_text, citation_quality_text, prompt_truncation_text,
+                                        randomness_text])
+            chat_button.click(chat_stream,
+                              inputs=[question_text, model_text, citation_quality_text, prompt_truncation_text,
+                                      randomness_text],
+                              outputs=answer_text)
 
         with gr.TabItem(label="Generate"):
             with gr.Row():
                 with gr.Column():
-                    answer_text = gr.Textbox(label="answer", lines=20)
-                    question_text = gr.Textbox(label="question", lines=2)
-                    generate_button = gr.Button(value="send", label="send", variant="primary")
-                    model_text = gr.Dropdown(label="model",
+                    answer_text = gr.Textbox(label="Answer", lines=10, max_lines=10, show_copy_button=True)
+                    question_text = gr.Textbox(label="Question", lines=2)
+            with gr.Row():
+                with gr.Column():
+                    clear_button = gr.Button(value="Clear", label="Clear")
+                with gr.Column():
+                    generate_button = gr.Button(value="Send", label="Send", variant="primary")
+            with gr.Row():
+                with gr.Column():
+                    model_text = gr.Dropdown(label="Model",
                                              choices=["command", "command-nightly",
                                                       "command-light", "command-light-nightly",
                                                       "base", "base-light"],
                                              value="command"
                                              )
+            with gr.Row():
+                with gr.Column():
+                    number_of_words_text = gr.Slider(label="~NUMBER OF WORDS(1 word is about 3 tokens)",
+                                                     minimum=0,
+                                                     maximum=1365,
+                                                     step=1,
+                                                     value=100,
+                                                     interactive=True
+                                                     )
+                with gr.Column():
+                    randomness_text = gr.Slider(label="RANDOMNESS(Temperature)",
+                                                minimum=0,
+                                                maximum=2,
+                                                step=0.1,
+                                                value=0.9,
+                                                interactive=True
+                                                )
+                with gr.Column():
+                    stop_sentence_text = gr.Textbox(label="STOP SEQUENCE", lines=1, interactive=True,
+                                                    placeholder="Input words seperated by ,")
+            with gr.Row():
+                with gr.Column():
+                    with gr.Accordion("Advanced Parameters", open=False):
+                        with gr.Row():
+                            with gr.Column():
+                                top_k_text = gr.Slider(label="TOP-K",
+                                                       minimum=0,
+                                                       maximum=500,
+                                                       step=1,
+                                                       value=0,
+                                                       interactive=True
+                                                       )
+                            with gr.Column():
+                                show_likelihood_text = gr.Checkbox(label="Show likelihood",
+                                                                   value=False,
+                                                                   interactive=True
+                                                                   )
+
+            with gr.Row():
+                with gr.Column():
                     gr.Examples(examples=["Write a LinkedIn post about starting a career in tech:",
                                           """Suggest three alternative titles with a better marketing copy for the \
 following blog.
@@ -159,17 +286,22 @@ or "text generation" """,
                                           """write a blog outline for a blog titled "How Transformers made Large \
 Language models possible" """],
                                 inputs=question_text)
-                    generate_button.click(generate_stream,
-                                          inputs=[question_text, model_text],
-                                          outputs=answer_text)
+            clear_button.click(clear_generate_stream,
+                               inputs=[],
+                               outputs=[question_text, answer_text, number_of_words_text, randomness_text,
+                                        stop_sentence_text, top_k_text, show_likelihood_text])
+            generate_button.click(generate_stream,
+                                  inputs=[question_text, model_text, number_of_words_text, randomness_text,
+                                          stop_sentence_text, top_k_text, show_likelihood_text],
+                                  outputs=answer_text)
 
         with gr.TabItem(label="Summarize"):
             with gr.Row():
                 with gr.Column():
-                    answer_text = gr.Textbox(label="answer", lines=20)
-                    question_text = gr.Textbox(label="question", lines=2)
-                    summarize_button = gr.Button(value="send", label="send", variant="primary")
-                    model_text = gr.Dropdown(label="model",
+                    answer_text = gr.Textbox(label="Answer", lines=10, max_lines=10, show_copy_button=True)
+                    question_text = gr.Textbox(label="Question", lines=2)
+                    summarize_button = gr.Button(value="Send", label="Send", variant="primary")
+                    model_text = gr.Dropdown(label="Model",
                                              choices=["command", "command-nightly",
                                                       "command-light", "command-light-nightly"],
                                              value="command"
@@ -293,18 +425,18 @@ If you're interested in using Cohere for your own SageMaker projects, you can no
 Additionally, you can reference Cohere's GitHub notebook for instructions on deploying the model and accessing it \
 from the Cohere Generate endpoint."""],
                                 inputs=question_text)
-                    summarize_button.click(summarize_stream,
-                                           inputs=[question_text, model_text],
-                                           outputs=answer_text)
+            summarize_button.click(summarize_stream,
+                                   inputs=[question_text, model_text],
+                                   outputs=answer_text)
 
         with gr.TabItem(label="Classify"):
             with gr.Row():
                 with gr.Column():
-                    answer_text = gr.Textbox(label="answer", lines=20)
-                    examples_text = gr.Textbox(label="examples", lines=2)
-                    question_text = gr.Textbox(label="question", lines=2)
-                    classify_button = gr.Button(value="send", label="send", variant="primary")
-                    model_text = gr.Dropdown(label="model",
+                    answer_text = gr.Textbox(label="Answer", lines=10, max_lines=10, show_copy_button=True)
+                    examples_text = gr.Textbox(label="Examples", lines=2)
+                    question_text = gr.Textbox(label="Question", lines=2)
+                    classify_button = gr.Button(value="Send", label="send", variant="primary")
+                    model_text = gr.Dropdown(label="Model",
                                              choices=[
                                                  "embed-multilingual-v2.0", "embed-english-v2.0",
                                                  "embed-english-light-v2.0"
@@ -385,10 +517,10 @@ from the Cohere Generate endpoint."""],
         with gr.TabItem(label="Embed"):
             with gr.Row():
                 with gr.Column():
-                    answer_text = gr.Textbox(label="answer", lines=20)
-                    question_text = gr.Textbox(label="question", lines=2)
-                    embed_button = gr.Button(value="send", label="send", variant="primary")
-                    model_text = gr.Dropdown(label="model",
+                    answer_text = gr.Textbox(label="Answer", lines=10, max_lines=10, show_copy_button=True)
+                    question_text = gr.Textbox(label="Question", lines=2)
+                    embed_button = gr.Button(value="Send", label="Send", variant="primary")
+                    model_text = gr.Dropdown(label="Model",
                                              choices=["embed-multilingual-v2.0", "embed-english-v2.0",
                                                       "embed-english-light-v2.0", "search-english-beta-2023-04-02",
                                                       # "rerank-multilingual-v2.0", "rerank-english-v2.0"
