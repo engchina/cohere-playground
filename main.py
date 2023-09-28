@@ -610,6 +610,7 @@ from the Cohere Generate endpoint."""],
             with gr.Row():
                 with gr.Column():
                     clear_button = gr.Button(value="Clear", label="Clear")
+                with gr.Column():
                     embed_button = gr.Button(value="Send", label="Send", variant="primary")
             with gr.Row():
                 with gr.Column():
