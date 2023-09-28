@@ -1,13 +1,13 @@
-# langchain-cohere
-Integration of Langchain and Cohere
+# cohere-playground
+Cohere Playground for learning cohere
 
 ## prepare
 
 create conda environment,
 
 ```
-conda create -n langchain-cohere python=3.10 -y
-conda activate langchain-cohere
+conda create -n cohere-playground python=3.10 -y
+conda activate cohere-playground
 ```
 
 install requirements,
@@ -16,10 +16,20 @@ install requirements,
 pip install -r requirements.txt
 ```
 
-config cohere api key 
+create .env file,
 
 ```
 cp .env.example .env
+```
+
+modify cohere api key, 
+
+```
+vi .env
+
+---
+COHERE_API_KEY=<input your cohere api key which is from https://dashboard.cohere.com/api-keys>
+---
 ```
 
 ## launch
