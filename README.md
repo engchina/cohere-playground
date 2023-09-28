@@ -41,3 +41,13 @@ python main.py
 ## access 
 
 open [http://127.0.0.1:7860/?__theme=dark](http://127.0.0.1:7860/?__theme=dark)
+
+![](./images/1.png)
+
+![](./images/2.png)
+
+![](./images/3.png)
+
+![](./images/4.png)
+
+![](./images/5.png)
