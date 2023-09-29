@@ -1,13 +1,12 @@
 import json
 import os
-from typing import NamedTuple
 
 import gradio as gr
 import cohere
 from cohere.responses.classify import Example
-from langchain.llms import Cohere
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+# from langchain.llms import Cohere
+# from langchain.prompts import PromptTemplate
+# from langchain.chains import LLMChain
 from dotenv import load_dotenv, find_dotenv
 
 # read local .env file
@@ -16,26 +15,6 @@ COHERE_API_KEY = os.environ["COHERE_API_KEY"]
 
 
 # co = cohere.Client(api_key=COHERE_API_KEY)
-
-
-async def clear_one_item():
-    yield gr.update(value="")
-
-
-async def clear_two_items():
-    yield gr.update(value=""), gr.update(value="")
-
-
-async def clear_three_items():
-    yield gr.update(value=""), gr.update(value=""), gr.update(value="")
-
-
-async def clear_four_items():
-    yield gr.update(value=""), gr.update(value=""), gr.update(value="")
-
-
-async def clear_five_items():
-    yield gr.update(value=""), gr.update(value=""), gr.update(value="")
 
 
 # def chat(question, model):
@@ -176,7 +155,7 @@ async def clear_embed_stream():
 
 
 with gr.Blocks() as demo:
-    gr.Markdown(value="# Cohere playground")
+    gr.Markdown(value="# (Unofficial) Cohere playground")
     with gr.Tabs() as tabs:
         with gr.TabItem(label="Chat"):
             with gr.Row():
@@ -638,4 +617,6 @@ from the Cohere Generate endpoint."""],
                                inputs=[question_text, model_text, truncate_text],
                                outputs=answer_text)
 
-demo.queue().launch()
+demo.queue()
+if __name__ == "__main__":
+    demo.launch()
