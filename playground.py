@@ -155,7 +155,7 @@ async def clear_embed_stream():
 
 
 with gr.Blocks() as demo:
-    gr.Markdown(value="# (Unofficial) Cohere playground")
+    gr.Markdown(value="# (Unofficial) Cohere Playground")
     with gr.Tabs() as tabs:
         with gr.TabItem(label="Chat"):
             with gr.Row():

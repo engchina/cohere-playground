@@ -75,7 +75,7 @@ demo = gr.ChatInterface(fn=chat_stream,
                             ["Give me a rundown of AI startups in the productivity space", "command-light-nightly",
                              "fast",
                              "off", 2]],
-                        title="(Unofficial) Cohere Coral")
+                        title="(Unofficial) Chat with Cohere Coral")
 
 demo.queue()
 if __name__ == "__main__":
