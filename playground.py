@@ -2,6 +2,7 @@ import json
 import os
 
 import gradio as gr
+import pandas as pd
 import cohere
 from cohere.responses.classify import Example
 # from langchain.llms import Cohere
@@ -45,12 +46,11 @@ async def chat_stream(question, model, citation_quality, prompt_truncation, rand
             # print(f"chat_stream type(token): {type(token)}")
             if isinstance(token, cohere.responses.chat.StreamTextGeneration):
                 completion += token.text
-                yield gr.update(value=completion)
+                yield gr.Textbox(value=completion)
 
 
 async def clear_chat_stream():
-    yield (gr.update(value=""), gr.update(value=""), gr.update(value="accurate"),
-           gr.update(value="auto"), gr.update(value=0.3))
+    yield (gr.Textbox(value=""), gr.Textbox(value=""))
 
 
 async def generate_stream(question, model, number_of_words, randomness,
@@ -74,12 +74,11 @@ async def generate_stream(question, model, number_of_words, randomness,
             # print(f"generate_stream type(token): {type(token)}")
             if isinstance(token, cohere.responses.generation.StreamingText):
                 completion += token.text
-                yield gr.update(value=completion)
+                yield gr.Textbox(value=completion)
 
 
 async def clear_generate_stream():
-    yield (gr.update(value=""), gr.update(value=""), gr.update(value=100), gr.update(value=0.9),
-           gr.update(value=""), gr.update(value=0), gr.update(value=False))
+    yield (gr.Textbox(value=""), gr.Textbox(value=""))
 
 
 async def summarize_stream(question, model, length, format, extractiveness,
@@ -101,19 +100,24 @@ async def summarize_stream(question, model, length, format, extractiveness,
         # print(f"summarize_stream type(summarize): {type(summarize)}")
         if isinstance(summarize, cohere.responses.summarize.SummarizeResponse):
             completion = summarize.summary
-            yield gr.update(value=completion)
+            yield gr.Textbox(value=completion)
 
 
 async def clear_summarize_stream():
-    yield (gr.update(value=""), gr.update(value=""), gr.update(value="medium"), gr.update(value="paragraph"),
-           gr.update(value="low"), gr.update(value=0.3), gr.update(value=""))
+    yield (gr.Textbox(value=""), gr.Textbox(value=""))
 
 
 async def classify_stream(question, model, examples):
     if question is None or len(question) == 0:
         return
-    examples = json.loads(examples)
-    examples = [Example(example["text"], example["label"]) for example in examples]
+    print(f"type(examples): {type(examples)}")
+    # print(f"examples: {examples}")
+    if isinstance(examples, pd.core.frame.DataFrame):
+        examples = examples.values
+    print(f"type(examples): {type(examples)}")
+    # print(f"examples: {examples}")
+    # examples = json.loads(examples)
+    examples = [Example(example[0], example[1]) for example in examples]
     async with cohere.AsyncClient(api_key=COHERE_API_KEY) as aio_co:
         classify = await aio_co.classify(
             inputs=[question],
@@ -124,11 +128,11 @@ async def classify_stream(question, model, examples):
         # print(f"classify_stream type(classify): {type(classify)}")
         if isinstance(classify, cohere.responses.classify.Classifications):
             completion = classify[0].prediction
-            yield gr.update(value=completion)
+            yield gr.Textbox(value=completion)
 
 
 async def clear_classify_stream():
-    yield gr.update(value=""), gr.update(value=""), gr.update(value="")
+    yield gr.Textbox(value=""), gr.Textbox(value="")
 
 
 async def embed_stream(question, model, truncate):
@@ -147,11 +151,11 @@ async def embed_stream(question, model, truncate):
         # print(f"type(embed): {type(embed)}")
         if isinstance(embed, cohere.responses.embeddings.Embeddings):
             completion = embed.embeddings
-            yield gr.update(value=completion)
+            yield gr.Textbox(value=completion)
 
 
 async def clear_embed_stream():
-    yield gr.update(value=""), gr.update(value=""), gr.update(value="END")
+    yield gr.Textbox(value=""), gr.Textbox(value="")
 
 
 with gr.Blocks() as demo:
@@ -207,8 +211,7 @@ with gr.Blocks() as demo:
                                 inputs=question_text)
             clear_button.click(clear_chat_stream,
                                inputs=[],
-                               outputs=[question_text, answer_text, citation_quality_text, prompt_truncation_text,
-                                        randomness_text])
+                               outputs=[question_text, answer_text])
             chat_button.click(chat_stream,
                               inputs=[question_text, model_text, citation_quality_text, prompt_truncation_text,
                                       randomness_text],
@@ -286,8 +289,7 @@ Language models possible" """],
                                 inputs=question_text)
             clear_button.click(clear_generate_stream,
                                inputs=[],
-                               outputs=[question_text, answer_text, number_of_words_text, randomness_text,
-                                        stop_sentence_text, top_k_text, show_likelihood_text])
+                               outputs=[question_text, answer_text])
             generate_button.click(generate_stream,
                                   inputs=[question_text, model_text, number_of_words_text, randomness_text,
                                           stop_sentence_text, top_k_text, show_likelihood_text],
@@ -478,8 +480,7 @@ from the Cohere Generate endpoint."""],
                                 inputs=question_text)
             clear_button.click(clear_summarize_stream,
                                inputs=[],
-                               outputs=[question_text, answer_text, length_text, format_text, extractiveness_text,
-                                        randomness_text, additional_command_text])
+                               outputs=[question_text, answer_text])
             summarize_button.click(summarize_stream,
                                    inputs=[question_text, model_text, length_text, format_text, extractiveness_text,
                                            randomness_text, additional_command_text],
@@ -489,8 +490,44 @@ from the Cohere Generate endpoint."""],
             with gr.Row():
                 with gr.Column():
                     answer_text = gr.Textbox(label="Answer", lines=10, max_lines=10, show_copy_button=True)
-                    examples_text = gr.Textbox(label="Examples", lines=2)
+                    # examples_text = gr.Textbox(label="Training Datas", lines=5)
                     question_text = gr.Textbox(label="Question", lines=2)
+            with gr.Row():
+                with gr.Column():
+                    examples_text = gr.Dataframe(
+                        headers=["text", "label"],
+                        datatype=["str", "str"],
+                        type="pandas",
+                        col_count=(2, "fixed"),
+                        label="Training Datas",
+                        interactive=True,
+                        value=[["I want to set up a recurring monthly transfer "
+                                "between my chequing and savings account. How do I "
+                                "do this?", "Savings accounts (chequing & savings)"],
+                               ["I would like to add my wife to my current chequing "
+                                "account so"
+                                "it's a joint account. What do I need to do?",
+                                "Savings accounts (chequing & savings)"],
+                               ["Can I set up automated payment for my bills?",
+                                "Savings accounts (chequing & savings)"],
+                               ["My family situation is changing and I need to "
+                                "update my risk profile for my equity investments",
+                                "Investments"],
+                               ["My family situation is changing and I need to "
+                                "update my risk profile for my equity investments",
+                                "Investments"],
+                               ["How can I minimize my tax exposure?",
+                                "Taxes"],
+                               ["I'm going to have a baby in November - what "
+                                "happens to my taxes?",
+                                "Taxes"],
+                               ["I'd like to increase my monthly RRSP contributions "
+                                "to my RRSP",
+                                "RRSP"],
+                               ["What is the ${currentYear} RRSP limit?",
+                                "RRSP"]
+                               ]
+                    )
             with gr.Row():
                 with gr.Column():
                     clear_button = gr.Button(value="Clear", label="Clear")
@@ -507,76 +544,85 @@ from the Cohere Generate endpoint."""],
                                              )
             with gr.Row():
                 with gr.Column():
-                    gr.Examples(examples=[json.dumps([{"text": "I want to set up a recurring monthly transfer "
-                                                               "between my chequing and savings account. How do I "
-                                                               "do this?",
-                                                       "label": "Savings accounts (chequing & savings)"},
-                                                      {
-                                                          "text": "I would like to add my wife to my current chequing "
-                                                                  "account so"
-                                                                  "it's a joint account. What do I need to do?",
-                                                          "label": "Savings accounts (chequing & savings)"},
-                                                      {
-                                                          "text": "Can I set up automated payment for my bills?",
-                                                          "label": "Savings accounts (chequing & savings)"},
-                                                      {
-                                                          "text": "Interest rates are going up - does this impact the "
-                                                                  "interest rate in my savings account?",
-                                                          "label": "Savings accounts (chequing & savings)"},
-                                                      {
-                                                          "text": "What is the best option for a student savings "
-                                                                  "account?",
-                                                          "label": "Savings accounts (chequing & savings)"},
-                                                      {
-                                                          "text": "My family situation is changing and I need to "
-                                                                  "update my risk profile for my equity investments",
-                                                          "label": "Investments"},
-                                                      {
-                                                          "text": "My family situation is changing and I need to "
-                                                                  "update my risk profile for my equity investments",
-                                                          "label": "Investments"},
-                                                      {
-                                                          "text": "How can I change my beneficiaries of my investment "
-                                                                  "accounts?",
-                                                          "label": "Investments"},
-                                                      {
-                                                          "text": "Is crypto an option for my investment account?",
-                                                          "label": "Investments"},
-                                                      {
-                                                          "text": "How can I minimize my tax exposure?",
-                                                          "label": "Taxes"},
-                                                      {
-                                                          "text": "I'm going to be late filing my ${currentYear - 1} "
-                                                                  "tax returns. Is there a penalty?",
-                                                          "label": "Taxes"},
-                                                      {
-                                                          "text": "I'm going to have a baby in November - what "
-                                                                  "happens to my taxes?",
-                                                          "label": "Taxes"},
-                                                      {
-                                                          "text": "I'd like to increase my monthly RRSP contributions "
-                                                                  "to my RRSP",
-                                                          "label": "RRSP"},
-                                                      {
-                                                          "text": "I want to take advantage of the First Time Home "
-                                                                  "Buyers program and take money out of my RRSP. How "
-                                                                  "does the program work?",
-                                                          "label": "RRSP"},
-                                                      {
-                                                          "text": "What is the ${currentYear} RRSP limit?",
-                                                          "label": "RRSP"}
-                                                      ])
-                                          ],
-                                inputs=examples_text)
+                    # gr.Examples(examples=[json.dumps([{"text": "I want to set up a recurring monthly transfer "
+                    #                                            "between my chequing and savings account. How do I "
+                    #                                            "do this?",
+                    #                                    "label": "Savings accounts (chequing & savings)"},
+                    #                                   {
+                    #                                       "text": "I would like to add my wife to my current chequing "
+                    #                                               "account so"
+                    #                                               "it's a joint account. What do I need to do?",
+                    #                                       "label": "Savings accounts (chequing & savings)"},
+                    #                                   {
+                    #                                       "text": "Can I set up automated payment for my bills?",
+                    #                                       "label": "Savings accounts (chequing & savings)"},
+                    #                                   {
+                    #                                       "text": "Interest rates are going up - does this impact the "
+                    #                                               "interest rate in my savings account?",
+                    #                                       "label": "Savings accounts (chequing & savings)"},
+                    #                                   {
+                    #                                       "text": "What is the best option for a student savings "
+                    #                                               "account?",
+                    #                                       "label": "Savings accounts (chequing & savings)"},
+                    #                                   {
+                    #                                       "text": "My family situation is changing and I need to "
+                    #                                               "update my risk profile for my equity investments",
+                    #                                       "label": "Investments"},
+                    #                                   {
+                    #                                       "text": "My family situation is changing and I need to "
+                    #                                               "update my risk profile for my equity investments",
+                    #                                       "label": "Investments"},
+                    #                                   {
+                    #                                       "text": "How can I change my beneficiaries of my investment "
+                    #                                               "accounts?",
+                    #                                       "label": "Investments"},
+                    #                                   {
+                    #                                       "text": "Is crypto an option for my investment account?",
+                    #                                       "label": "Investments"},
+                    #                                   {
+                    #                                       "text": "How can I minimize my tax exposure?",
+                    #                                       "label": "Taxes"},
+                    #                                   {
+                    #                                       "text": "I'm going to be late filing my ${currentYear - 1} "
+                    #                                               "tax returns. Is there a penalty?",
+                    #                                       "label": "Taxes"},
+                    #                                   {
+                    #                                       "text": "I'm going to have a baby in November - what "
+                    #                                               "happens to my taxes?",
+                    #                                       "label": "Taxes"},
+                    #                                   {
+                    #                                       "text": "I'd like to increase my monthly RRSP contributions "
+                    #                                               "to my RRSP",
+                    #                                       "label": "RRSP"},
+                    #                                   {
+                    #                                       "text": "I want to take advantage of the First Time Home "
+                    #                                               "Buyers program and take money out of my RRSP. How "
+                    #                                               "does the program work?",
+                    #                                       "label": "RRSP"},
+                    #                                   {
+                    #                                       "text": "What is the ${currentYear} RRSP limit?",
+                    #                                       "label": "RRSP"}
+                    #                                   ])
+                    #                       ],
+                    #             label="Training Examples",
+                    #             inputs=examples_text)
+                    # gr.Examples(examples=[
+                    #     ["I want to set up a recurring monthly transfer "
+                    #      "between my chequing and savings account. How do I "
+                    #      "do this?",
+                    #      "Savings accounts (chequing & savings)"]],
+                    #     label="Training Examples",
+                    #     inputs=examples_text2),
                     gr.Examples(examples=["How can I set up a 3rd party contribution to my RRSP?",
                                           "Where can I find my unused RRSP contribution?",
                                           "How do I link my return with my partners?",
                                           "Do I need to complete a return if I moved to Canada this year?",
                                           "Can I set up a business account on your platform?"],
+                                label="Question Examples",
                                 inputs=question_text)
             clear_button.click(clear_classify_stream,
                                inputs=[],
-                               outputs=[question_text, answer_text, examples_text])
+                               outputs=[question_text, answer_text])
             classify_button.click(classify_stream,
                                   inputs=[question_text, model_text, examples_text],
                                   outputs=answer_text)
@@ -612,7 +658,7 @@ from the Cohere Generate endpoint."""],
                                 inputs=question_text)
             clear_button.click(clear_embed_stream,
                                inputs=[],
-                               outputs=[question_text, answer_text, truncate_text])
+                               outputs=[question_text, answer_text])
             embed_button.click(embed_stream,
                                inputs=[question_text, model_text, truncate_text],
                                outputs=answer_text)

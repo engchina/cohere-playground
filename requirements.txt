@@ -1,4 +1,5 @@
 langchain
 cohere
 gradio
+pandas
 python-dotenv

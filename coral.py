@@ -10,13 +10,17 @@ from dotenv import load_dotenv, find_dotenv
 _ = load_dotenv(find_dotenv())
 COHERE_API_KEY = os.environ["COHERE_API_KEY"]
 
+chat_history = []
+
 
 async def chat_stream(question, history, model, citation_quality, prompt_truncation, randomness):
     if question is None or len(question) == 0:
         return
+    history = chat_history
     async with cohere.AsyncClient(api_key=COHERE_API_KEY) as aio_co:
         streaming_chat = await aio_co.chat(
             message=question,
+            chat_history=history,
             model=model,
             stream=True,
             citation_quality=citation_quality,
@@ -30,6 +34,14 @@ async def chat_stream(question, history, model, citation_quality, prompt_truncat
             if isinstance(token, cohere.responses.chat.StreamTextGeneration):
                 completion += token.text
                 yield completion
+
+        if len(chat_history) == 10:
+            chat_history.pop(0)
+        user_message = {"user_name": "User", "text": question}
+        bot_message = {"user_name": "Chatbot", "text": completion}
+
+        chat_history.append(user_message)
+        chat_history.append(bot_message)
 
 
 model_text = gr.Dropdown(label="Model",
